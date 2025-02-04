@@ -1,0 +1,186 @@
+esphome:
+  name: fingersensor-garage
+  friendly_name: Fingersensor_Garage
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "CvXmAdiTiRUrz4OBmK221aA+Yp1KM6boe10AenbmgTI="
+  services:
+  - service: enroll
+    variables:
+      finger_id: int
+      num_scans: int
+    then:
+      - fingerprint_grow.enroll:
+          finger_id: !lambda 'return finger_id;'
+          num_scans: !lambda 'return num_scans;'
+      - fingerprint_grow.aura_led_control:
+          state: ALWAYS_ON
+          speed: 0
+          color: PURPLE
+          count: 0
+  - service: cancel_enroll
+    then:
+      - fingerprint_grow.cancel_enroll:
+  - service: delete
+    variables:
+      finger_id: int
+    then:
+      - fingerprint_grow.delete:
+          finger_id: !lambda 'return finger_id;'
+  - service: delete_all
+    then:
+      - fingerprint_grow.delete_all:
+
+ota:
+  - platform: esphome
+    password: "a4267de03053722b3ed313630e4eca2b"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Fingersensor-Garage"
+    password: "yXMozWi8fn2W"
+
+captive_portal:
+
+
+uart:
+  rx_pin: GPIO03
+  tx_pin: GPIO04
+  baud_rate: 57600
+
+fingerprint_grow:
+  sensing_pin: GPIO02
+  sensor_power_pin:
+        number: GPIO05
+        inverted: true
+  idle_period_to_sleep: 5s
+  on_finger_scan_matched:
+    - switch.turn_on: trigger_relay
+    - homeassistant.event:
+        event: esphome.test_node_finger_scan_matched
+        data:
+          finger_id: !lambda 'return finger_id;'
+          confidence: !lambda 'return confidence;'
+    - fingerprint_grow.aura_led_control:
+        state: BREATHING
+        speed: 200
+        color: GREEN
+        count: 1
+    - text_sensor.template.publish:
+        id: fingerprint_state
+        state: "Autorisiert"
+
+  on_finger_scan_unmatched:
+    - homeassistant.event:
+        event: esphome.test_node_finger_scan_unmatched
+    - fingerprint_grow.aura_led_control:
+        state: FLASHING
+        speed: 25
+        color: RED
+        count: 2
+    - text_sensor.template.publish:
+        id: fingerprint_state
+        state: "Unautorisiert"
+
+  on_enrollment_scan:
+    - homeassistant.event:
+        event: esphome.test_node_enrollment_scan
+        data:
+          finger_id: !lambda 'return finger_id;'
+          scan_num: !lambda 'return scan_num;'
+    - fingerprint_grow.aura_led_control:
+        state: FLASHING
+        speed: 25
+        color: BLUE
+        count: 2
+    - fingerprint_grow.aura_led_control:
+        state: ALWAYS_ON
+        speed: 0
+        color: PURPLE
+        count: 0
+    - text_sensor.template.publish:
+        id: fingerprint_state
+        state: "Anlernen"
+
+  on_enrollment_done:
+    - homeassistant.event:
+        event: esphome.test_node_enrollment_done
+        data:
+          finger_id: !lambda 'return finger_id;'
+    - fingerprint_grow.aura_led_control:
+        state: BREATHING
+        speed: 100
+        color: BLUE
+        count: 2
+    - text_sensor.template.publish:
+        id: fingerprint_state
+        state: "Registrieren"
+
+  on_enrollment_failed:
+    - homeassistant.event:
+        event: esphome.test_node_enrollment_failed
+        data:
+          finger_id: !lambda 'return finger_id;'
+    - fingerprint_grow.aura_led_control:
+        state: FLASHING
+        speed: 25
+        color: RED
+        count: 4
+    - text_sensor.template.publish:
+        id: fingerprint_state
+        state: "Fehler"
+
+# Optional direkt angeschlossenes Relaay
+switch:
+  - platform: gpio
+    id: trigger_relay
+    pin: GPIO07
+    name: "Garagentor Relay"
+    on_turn_on:
+      - delay: 1s
+      - switch.turn_off: trigger_relay
+
+
+# Optional template text sensor for visual feedback
+text_sensor:
+  - platform: template
+    id: fingerprint_state
+    name: "Garage Fingerprint State"
+    lambda: |-
+      return {"-"};
+    update_interval: 6s
+
+# Optional sensors
+binary_sensor:
+  - platform: fingerprint_grow
+    id: fingerprint_enrolling
+    name: "Garage Fingerprint Enrolling"
+
+sensor:
+  - platform: fingerprint_grow
+    fingerprint_count:
+      name: "Garage Abdruck Zähler"
+    last_finger_id:
+      name: "Garage Letzte Abdruck ID"
+    last_confidence:
+      name: "Garage Letzte Autorisation"
+    status:
+      name: "Garage Abdruck Status"
+    capacity:
+      name: "Garage Abdruck Menge"
+    security_level:
+      name: "Garage Abdruck Sicherheitslevel"
