@@ -13,7 +13,7 @@ logger:
 # Enable Home Assistant API
 api:
   encryption:
-    key: "CvXmAdiTiRUrz4OBmK221aA+Yp1KM6boe10AenbmgTI="
+    key: "there-is-the-key"
   services:
   - service: enroll
     variables:
@@ -43,7 +43,7 @@ api:
 
 ota:
   - platform: esphome
-    password: "a4267de03053722b3ed313630e4eca2b"
+    password: "there-is-the-key"
 
 wifi:
   ssid: !secret wifi_ssid
@@ -52,7 +52,7 @@ wifi:
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: "Fingersensor-Garage"
-    password: "yXMozWi8fn2W"
+    password: "key"
 
 captive_portal:
 
